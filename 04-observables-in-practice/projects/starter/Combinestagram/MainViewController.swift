@@ -40,14 +40,66 @@ class MainViewController: UIViewController {
   @IBOutlet weak var buttonClear: UIButton!
   @IBOutlet weak var buttonSave: UIButton!
   @IBOutlet weak var itemAdd: UIBarButtonItem!
+  
+  private let images = BehaviorRelay<[UIImage]>(value: [])
+  private let disposeBag = DisposeBag()
+  
+  private struct Constants {
+    static let maxPhotosAllowed: Int = 6
+  }
 
   override func viewDidLoad() {
     super.viewDidLoad()
-
+    
+    // subscription to show images in the preview rectangle
+    images
+      .subscribe(onNext: { [weak imagePreview] photos in
+        guard let preview = imagePreview else { return }
+        preview.image = photos.collage(size: preview.frame.size)
+      })
+      .disposed(by: disposeBag)
+    
+    // subscription to update the UI
+    images
+      .subscribe(onNext: { [weak self] images in
+        self?.updateUI()
+      })
+      .disposed(by: disposeBag)
+  }
+  
+  private var enableClearButton: Bool {
+    images.value.count > 0
+  }
+  
+  private var enableSaveButton: Bool {
+    guard images.value.count > 0 else {
+      return false
+    }
+    
+    guard images.value.count != 1 else {
+      return true
+    }
+    
+    guard images.value.count % 2 == 0 else {
+      return false
+    }
+    return true
+  }
+  
+  private var enableAddButton: Bool {
+    images.value.count < 6
+  }
+  
+  private func updateUI() {
+    buttonClear.isEnabled = enableClearButton
+    buttonSave.isEnabled = enableSaveButton
+    itemAdd.isEnabled = enableAddButton
+    title = images.value.count > 0 ? "\(images.value.count) Photos selected" : "Collage"
   }
   
   @IBAction func actionClear() {
-
+    // clear the current selection
+    images.accept([])
   }
 
   @IBAction func actionSave() {
@@ -55,7 +107,9 @@ class MainViewController: UIViewController {
   }
 
   @IBAction func actionAdd() {
-
+    let newImage = UIImage(named: "IMG_1907")!
+    let newImages = images.value + [newImage]
+    images.accept(newImages)
   }
 
   func showMessage(_ title: String, description: String? = nil) {
